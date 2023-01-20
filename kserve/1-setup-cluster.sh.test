@@ -1,0 +1,20 @@
+#!/bin/bash
+step=0
+echo "$step/99 reset cluster"
+kind delete clusters kserve
+for i in {5..1}
+do
+ echo "wait for cluster clean. $i"
+ sleep 1
+done
+
+let "step=step+1"
+echo "$step/99 init cluster master"
+kind create cluster --config ./kind-config.yaml
+
+##let "step=step+1"
+#echo "$step/99 set cluster node port range"
+#line_num=$(grep -n "service-cluster-ip-range=" /etc/kubernetes/manifests/kube-apiserver.yaml | cut -d ":" -f 1)
+#line="   - --service-node-port-range=1-65535"
+#sed -i "${line_num}a\ $line" /etc/kubernetes/manifests/kube-apiserver.yaml
+

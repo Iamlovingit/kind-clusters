@@ -1,0 +1,60 @@
+#!/bin/bash
+step=0
+echo "$step/99 reset cluster"
+kind delete clusters kserve
+for i in {5..1}
+do
+ echo "wait for cluster clean. $i"
+ sleep 1
+done
+
+let "step=step+1"
+echo "$step/99 init cluster master"
+kind create cluster --config ./kind-config.yaml
+
+let "step=step+1"
+echo "$step/99 set cluster node port range"
+line_num=$(grep -n "service-cluster-ip-range=" /etc/kubernetes/manifests/kube-apiserver.yaml | cut -d ":" -f 1)
+line="   - --service-node-port-range=1-65535"
+sed -i "${line_num}a\ $line" /etc/kubernetes/manifests/kube-apiserver.yaml
+
+let "step=step+1"
+echo "$step/99 install metallb"
+kubectl apply -f metallb/namespace.yaml
+kubectl apply -f metallb/metallb.yaml
+kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"
+kubectl apply -f metallb/configmap.yaml
+
+
+let "step=step+1"
+echo "$step/99 install istio"
+#istioctl install -y -f istio-1.8.4/istio.yaml
+kubectl apply -f istio-1.8.4/istio.yaml
+
+let "step=step+1"
+echo "$step/99 install knative"
+kubectl apply -f knative-0.22.0/serving-crds.yaml
+kubectl apply -f knative-0.22.0/serving-core.yaml
+kubectl apply -f knative-0.22.0/net-istio.yaml
+
+let "step=step+1"
+echo "$step/99 install cert-manager"
+kubectl apply -f cert-manager/cert-manager.yaml
+
+let "step=step+1"
+echo "$step/99 install cert-manager"
+kubectl apply -f ingress/deploy.yaml
+
+let "step=step+1"
+echo "$step/99 init cqs dev environment"
+rm -rf /home/cqs/.kube
+mkdir -p /home/cqs/.kube
+cp  ~/.kube/config /home/cqs/.kube/.
+chown cqs:cqs /home/cqs/.kube/config
+
+
+for i in {30..1}
+do
+ echo "wait for cert manager startup. $i"
+ sleep 1
+done
